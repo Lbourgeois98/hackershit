@@ -1,0 +1,5 @@
+requests
+faker
+twocaptcha-python
+ccutils
+stripe
