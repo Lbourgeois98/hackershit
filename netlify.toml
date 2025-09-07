@@ -1,9 +1,0 @@
-[build]
-  publish = "public"
-  functions = "functions"
-
-[[redirects]]
-  from = "/capture"
-  to = "/.netlify/functions/capture"
-  status = 200
-  force = true
